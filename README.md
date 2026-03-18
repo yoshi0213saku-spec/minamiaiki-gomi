@@ -1,0 +1,1 @@
+# minamiaiki-gomi
