@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>南相木村ごみナビ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-green: #2d5a27;
+            --burnable: #ef4444;
+            --plastic: #facc15;
+            --non-burnable: #3b82f6;
+            --resource: #22c55e;
+            --hazardous: #a855f7;
+        }
+        body {
+            background-color: #f0f2f5;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            overflow-x: hidden;
+        }
+        .app-header {
+            background: linear-gradient(135deg, var(--primary-green) 0%, #1e3d1a 100%);
+            padding-bottom: 1.5rem;
+            border-radius: 0 0 24px 24px;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+        .main-card {
+            border-radius: 20px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        .type-badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px;
+            border-radius: 12px;
+            font-weight: 800;
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .bg-plastic { background-color: var(--plastic); color: #1a1a1a; }
+        .bg-burnable { background-color: var(--burnable); }
+        .bg-non-burnable { background-color: var(--non-burnable); }
+        .bg-resource { background-color: var(--resource); }
+        .bg-hazardous { background-color: var(--hazardous); }
+        .bg-none { background-color: #f1f5f9; color: #cbd5e1; }
+
+        /* 横スワイプ用コンテナ */
+        .month-slider {
+            display: flex;
+            overflow-x: auto;
+            scroll-snap-type: x mandatory;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            scroll-behavior: smooth;
+        }
+        .month-slider::-webkit-scrollbar {
+            display: none;
+        }
+        .month-page {
+            flex: 0 0 100%;
+            width: 100%;
+            scroll-snap-align: start;
+            padding: 0 1rem;
+            box-sizing: border-box;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        .calendar-item {
+            display: flex;
+            flex-direction: column;
+            padding: 12px;
+            background: white;
+            border-radius: 12px;
+            border: 1px solid #f1f5f9;
+        }
+
+        /* 月選択ボタン */
+        .month-tab {
+            padding: 8px 20px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 900;
+            color: white;
+            white-space: nowrap;
+            transition: all 0.2s;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+        }
+        .tab-2025 { background: rgba(59, 130, 246, 0.25); }
+        .tab-2026 { background: rgba(255, 255, 255, 0.15); }
+        .tab-2027 { background: rgba(52, 211, 153, 0.25); }
+
+        .month-tab.active {
+            background: white !important;
+            color: var(--primary-green) !important;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            border-color: white;
+        }
+        
+        .month-scroll-container {
+            display: flex;
+            overflow-x: auto;
+            gap: 8px;
+            padding: 4px 16px;
+            scrollbar-width: none;
+        }
+        .month-scroll-container::-webkit-scrollbar { display: none; }
+
+        .year-indicator {
+            font-size: 0.6rem;
+            display: block;
+            opacity: 0.8;
+            margin-bottom: -2px;
+        }
+
+        html { scroll-behavior: smooth; }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <!-- Header Area -->
+    <header class="app-header pt-6 text-white text-center shadow-md">
+        <div class="flex justify-between items-center mb-4 px-6">
+            <div class="w-8"></div>
+            <h1 class="text-xl font-black tracking-wider">南相木村ごみナビ</h1>
+            <button onclick="resetToToday()" class="p-2 opacity-80 active:opacity-100">
+                <i class="fas fa-home text-lg"></i>
+            </button>
+        </div>
+        
+        <!-- 月選択タブ -->
+        <div class="month-scroll-container" id="month-tabs">
+            <!-- JSで生成 -->
+        </div>
+    </header>
+
+    <main class="mt-4">
+        
+        <!-- Today Section -->
+        <section id="today-section" class="px-4 mb-6">
+            <div class="main-card bg-white p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-gray-500 font-bold text-sm" id="today-display">--/--（-）</span>
+                    <span class="bg-red-100 text-red-600 text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-tighter">本日の収集</span>
+                </div>
+                <div id="today-content" class="text-center">
+                    <!-- JSで挿入 -->
+                </div>
+                <div class="mt-4 pt-3 border-t border-gray-100 flex items-center justify-center text-[10px] text-gray-400">
+                    <i class="fas fa-arrow-left mr-2"></i> 左右にスワイプで月を移動 <i class="fas fa-arrow-right ml-2"></i>
+                </div>
+            </div>
+        </section>
+
+        <!-- Monthly Slider Area -->
+        <section class="mb-8">
+            <div class="month-slider" id="month-slider">
+                <!-- JSで月ごとのページ(month-page)を生成 -->
+            </div>
+        </section>
+
+        <!-- Search Bar -->
+        <section class="px-4 mb-8">
+            <h2 class="text-gray-600 font-black text-sm mb-3 pl-1">ごみ分別を調べる</h2>
+            <div class="bg-white flex items-center px-4 py-1 shadow-sm border border-gray-100 rounded-2xl">
+                <i class="fas fa-search text-gray-300 ml-2"></i>
+                <input type="text" id="search-input" placeholder="例：電池、ビデオテープ" 
+                       class="w-full p-3 text-lg focus:outline-none bg-transparent">
+            </div>
+            <div id="search-results" class="mt-4 space-y-3 hidden px-1">
+                <!-- JSで挿入 -->
+            </div>
+        </section>
+
+        <!-- Info Cards -->
+        <section class="px-4 grid grid-cols-2 gap-3 mb-10">
+            <div class="bg-blue-50 p-4 rounded-2xl text-center border border-blue-100">
+                <i class="fas fa-phone-alt text-blue-500 mb-1 text-lg"></i>
+                <p class="text-[9px] text-blue-600 font-bold uppercase">役場 住民課</p>
+                <a href="tel:0267-78-2121" class="text-xs font-black text-blue-800 tracking-tighter">78-2121</a>
+            </div>
+            <div class="bg-orange-50 p-4 rounded-2xl text-center border border-orange-100">
+                <i class="fas fa-clock text-orange-500 mb-1 text-lg"></i>
+                <p class="text-[9px] text-orange-600 font-bold uppercase">出し方</p>
+                <span class="text-[10px] font-black text-orange-800 leading-tight">朝8:30まで</span>
+            </div>
+        </section>
+
+    </main>
+
+    <footer class="pb-12 text-center">
+        <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest">Minamiaiki Digital Museum Project</p>
+    </footer>
+
+    <script>
+        const CONFIG = {
+            nonBurnableDates: [
+                "2025-04-10", "2025-06-12", "2025-08-14", "2025-10-09", "2025-12-11", "2026-02-12",
+                "2026-04-09", "2026-06-11", "2026-08-13", "2026-10-08", "2026-12-10", "2027-02-11"
+            ],
+            resourceDates: [
+                "2025-04-24", "2025-05-22", "2025-06-26", "2025-07-24", "2025-08-28", "2025-09-25", 
+                "2025-10-23", "2025-11-27", "2025-12-25", "2026-01-22", "2026-02-26", "2026-03-26",
+                "2026-04-23", "2026-05-28", "2026-06-25", "2026-07-23", "2026-08-27", "2026-09-24",
+                "2026-10-22", "2026-11-26", "2026-12-24", "2027-01-28", "2027-02-25", "2027-03-25"
+            ],
+            specialRules: {
+                "2025-12-30": "可燃ごみ", "2026-01-04": "臨時",
+                "2026-12-29": "可燃ごみ", "2027-01-04": "臨時"
+            }
+        };
+
+        const DICTIONARY = [
+            { name: "ビデオテープ", type: "non-burnable", label: "不燃ごみ", note: "透明袋。" },
+            { name: "乾電池", type: "hazardous", label: "有害ごみ", note: "透明袋。" },
+            { name: "ペットボトル", type: "resource", label: "資源ごみ", note: "洗浄して資源の日。" },
+            { name: "トレイ・パック", type: "plastic", label: "プラ容器", note: "黄色袋。" },
+            { name: "新聞紙", type: "resource", label: "資源ごみ", note: "紐で十字に。" },
+            { name: "スプレー缶", type: "hazardous", label: "有害ごみ", note: "中身を出し切る。" },
+            { name: "生ごみ", type: "burnable", label: "可燃ごみ", note: "水をよく切って。" }
+        ];
+
+        const REAL_TODAY = new Date();
+        const monthSlider = document.getElementById('month-slider');
+        const monthTabsContainer = document.getElementById('month-tabs');
+        
+        const dayNames = ["日", "月", "火", "水", "木", "金", "土"];
+
+        function getGarbageTypes(dateStr) {
+            const date = new Date(dateStr);
+            const day = date.getDay();
+            const nth = Math.ceil(date.getDate() / 7);
+            if (CONFIG.specialRules[dateStr]) return [{ label: CONFIG.specialRules[dateStr], type: "burnable" }];
+            let results = [];
+            if (day === 2 || day === 5) results.push({ label: "可燃ごみ", type: "burnable" });
+            if (day === 3 && (nth === 1 || nth === 3)) results.push({ label: "プラ容器", type: "plastic" });
+            if (CONFIG.nonBurnableDates.includes(dateStr)) results.push({ label: "不燃ごみ", type: "non-burnable" });
+            if (CONFIG.resourceDates.includes(dateStr)) results.push({ label: "資源ごみ", type: "resource" });
+            return results.length > 0 ? results : [{ label: "なし", type: "none" }];
+        }
+
+        function initApp() {
+            // 1. 今日の表示を更新
+            const todayStr = `${REAL_TODAY.getFullYear()}-${String(REAL_TODAY.getMonth()+1).padStart(2,'0')}-${String(REAL_TODAY.getDate()).padStart(2,'0')}`;
+            const todayDisplayEl = document.getElementById('today-display');
+            if (todayDisplayEl) {
+                const m = REAL_TODAY.getMonth() + 1;
+                const d = REAL_TODAY.getDate();
+                const w = dayNames[REAL_TODAY.getDay()];
+                todayDisplayEl.innerText = `${m}/${d}（${w}）`;
+            }
+            renderTypes('today-content', getGarbageTypes(todayStr), true);
+
+            // 2. 12か月分の月間カレンダーを生成
+            monthSlider.innerHTML = '';
+            monthTabsContainer.innerHTML = '';
+            let tempDate = new Date(REAL_TODAY.getFullYear(), REAL_TODAY.getMonth(), 1);
+
+            for (let i = 0; i < 12; i++) {
+                const y = tempDate.getFullYear();
+                const m = tempDate.getMonth();
+
+                // --- タブ生成 ---
+                const btn = document.createElement('button');
+                btn.id = `tab-${y}-${m}`;
+                btn.className = `month-tab tab-${y}`;
+                btn.innerHTML = `<span class="year-indicator">${y}</span>${m + 1}月`;
+                btn.onclick = () => scrollToMonth(i);
+                monthTabsContainer.appendChild(btn);
+
+                // --- ページ生成 ---
+                const page = document.createElement('div');
+                page.className = 'month-page';
+                page.dataset.index = i;
+                
+                let html = `<div class="flex items-center justify-between mb-4 px-1">
+                                <h2 class="text-gray-700 font-black text-base uppercase tracking-tight">${y}年 ${m + 1}月</h2>
+                                <span class="text-[10px] text-gray-300 font-bold">${i+1}/12</span>
+                            </div>
+                            <div class="calendar-grid">`;
+                
+                const lastDay = new Date(y, m + 1, 0).getDate();
+                for (let d = 1; d <= lastDay; d++) {
+                    const dateStr = `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                    const types = getGarbageTypes(dateStr);
+                    const dayNum = new Date(y, m, d).getDay();
+                    const isToday = (dateStr === todayStr);
+
+                    const dateColor = dayNum === 0 ? 'text-red-500' : (dayNum === 6 ? 'text-blue-500' : 'text-gray-400');
+                    const wChar = dayNames[dayNum];
+
+                    html += `
+                        <div class="calendar-item ${isToday ? 'ring-2 ring-[#2d5a27] border-green-200 bg-green-50' : ''}">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="text-xs font-black ${dateColor}">${m + 1}/${d}（${wChar}）</span>
+                            </div>
+                            <div class="flex flex-wrap gap-1">
+                                ${types.map(t => `
+                                    <span class="px-2 py-1 rounded-md text-[11px] font-black bg-${t.type} ${t.type === 'plastic' ? 'text-gray-800' : (t.type === 'none' ? 'text-gray-300 border border-gray-100' : 'text-white')}">
+                                        ${t.label}
+                                    </span>
+                                `).join('')}
+                            </div>
+                        </div>`;
+                }
+                html += `</div>`;
+                page.innerHTML = html;
+                monthSlider.appendChild(page);
+
+                tempDate.setMonth(tempDate.getMonth() + 1);
+            }
+
+            updateActiveTab(0);
+        }
+
+        function scrollToMonth(index) {
+            const width = monthSlider.clientWidth;
+            monthSlider.scrollTo({ left: width * index, behavior: 'smooth' });
+        }
+
+        function resetToToday() {
+            scrollToMonth(0);
+        }
+
+        monthSlider.addEventListener('scroll', () => {
+            const index = Math.round(monthSlider.scrollLeft / monthSlider.clientWidth);
+            updateActiveTab(index);
+        }, { passive: true });
+
+        function updateActiveTab(index) {
+            const tabs = document.querySelectorAll('.month-tab');
+            tabs.forEach((tab, i) => {
+                if (i === index) {
+                    tab.classList.add('active');
+                    tab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                } else {
+                    tab.classList.remove('active');
+                }
+            });
+        }
+
+        function renderTypes(id, types, isLarge) {
+            const container = document.getElementById(id);
+            if (!container) return;
+            container.innerHTML = '';
+            types.forEach(t => {
+                const div = document.createElement('div');
+                div.className = isLarge ? `type-badge bg-${t.type} text-lg mb-2` : `px-2 py-1 rounded text-xs bg-${t.type}`;
+                let label = t.label;
+                if(isLarge) {
+                    div.innerHTML = `<i class="fas ${getIcon(t.type)} mr-3"></i>${label}`;
+                } else { div.innerText = label; }
+                container.appendChild(div);
+            });
+        }
+
+        function getIcon(type) {
+            switch(type) {
+                case 'burnable': return 'fa-fire';
+                case 'plastic': return 'fa-recycle';
+                case 'non-burnable': return 'fa-dumpster';
+                case 'resource': return 'fa-wine-bottle';
+                default: return 'fa-calendar-times';
+            }
+        }
+
+        const searchInput = document.getElementById('search-input');
+        const searchResults = document.getElementById('search-results');
+        if (searchInput && searchResults) {
+            searchInput.addEventListener('input', (e) => {
+                const val = e.target.value.trim();
+                if (val.length === 0) { searchResults.classList.add('hidden'); return; }
+                const filtered = DICTIONARY.filter(i => i.name.includes(val) || i.label.includes(val));
+                searchResults.classList.remove('hidden');
+                searchResults.innerHTML = filtered.map(i => `
+                    <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-${i.type === 'plastic' ? 'yellow' : (i.type === 'burnable' ? 'red' : 'blue')}-400">
+                        <div class="flex justify-between items-center">
+                            <span class="font-black text-gray-800 text-base">${i.name}</span>
+                            <span class="text-xs font-bold px-3 py-1 rounded bg-${i.type} ${i.type === 'plastic' ? 'text-gray-800' : 'text-white'}">${i.label}</span>
+                        </div>
+                    </div>
+                `).join('') || '<p class="text-center text-gray-400 text-xs py-4">該当なし</p>';
+            });
+        }
+
+        window.onload = initApp;
+        window.onresize = () => {
+            const index = Math.round(monthSlider.scrollLeft / monthSlider.clientWidth);
+            scrollToMonth(index);
+        };
+    </script>
+</body>
+</html>
